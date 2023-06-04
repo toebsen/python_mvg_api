@@ -4,11 +4,11 @@ import requests
 import datetime
 from time import mktime
 
-query_url_name = "https://www.mvg.de/api/fahrinfo/location/queryWeb?q={name}"  # for station names
-query_url_id = "https://www.mvg.de/api/fahrinfo/location/query?q={id}"  # for station ids
-departure_url = "https://www.mvg.de/api/fahrinfo/departure/{id}?footway={offset}"
-nearby_url = "https://www.mvg.de/api/fahrinfo/location/nearby?latitude={lat}&longitude={lon}"
-routing_url = "https://www.mvg.de/api/fahrinfo/routing/?"
+query_url_name = "https://www.mvg.de/api/fib/v2/location?query={name}"  # for station names
+query_url_id = "https://www.mvg.de/api/fib/v2/location/query?globalId={id}"  # for station ids
+departure_url = "https://www.mvg.de/api/fib/v2/departure?query&globalId={id}&offsetInMinutes={offset}"
+nearby_url = "https://www.mvg.de/api/fib/v2/location/nearby?latitude={lat}&longitude={lon}"
+routing_url = "https://www.mvg.de/api/fib/v2/routing/?"
 interruptions_url = "https://www.mvg.de/.rest/betriebsaenderungen/api/interruptions"
 id_prefix = "de:09162:"
 
@@ -148,7 +148,7 @@ def get_id_for_station(station_name):
         station = get_stations(station_name)[0]
     except IndexError:
         return None
-    return station['id']
+    return station['globalId']
 
 
 def get_locations(query):
@@ -192,7 +192,7 @@ def get_locations(query):
         url = query_url_id.format(id=str(query))
 
     results = _perform_api_request(url)
-    return results["locations"]
+    return results
 
 
 def get_stations(station):
@@ -202,7 +202,7 @@ def get_stations(station):
     results = get_locations(station)
     stations = []
     for result in results:
-        if result['type'] == 'station':
+        if result['type'].lower() == 'station':
             stations.append(result)
     return stations
 
@@ -345,17 +345,17 @@ def get_departures(station_id, timeoffset=0):
                          You can find it out by running \
                          get_id_for_station('Station name')")
     url = departure_url.format(id=station_id, offset=timeoffset)
-    departures = _perform_api_request(url)['departures']
+    departures = _perform_api_request(url)
     for departure in departures:
         # For some reason, mvg gives you a Unix timestamp, but in milliseconds.
         # Here, we convert it to datetime
-        time = _convert_time(departure['departureTime'])
+        time = _convert_time(departure['realtimeDepartureTime'])
         relative_time = time - datetime.datetime.now()
-        if 'delay' in departure:
-            delay = departure['delay']
+        if 'delayInMinutes' in departure:
+            delay = departure['delayInMinutes']
         else:
             delay = 0
-        departure[u'departureTimeMinutes'] = relative_time // datetime.timedelta(seconds=60) + delay
+        departure['departureTimeMinutes'] = relative_time // datetime.timedelta(seconds=60) + delay
     return departures
 
 
